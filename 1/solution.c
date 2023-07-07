@@ -1,28 +1,17 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include "libcoro.h"
+#include "coro_util.h"
+#include <limits.h>
+#include "heap_help.h"
 
 /**
  * You can compile and run this code using the commands:
  *
- * $> gcc solution.c libcoro.c
+ * $> gcc solution.c libcoro.c coro_util.c
  * $> ./a.out
  */
 
-/**
- * A function, called from inside of coroutines recursively. Just to demonstrate
- * the example. You can split your code into multiple functions, that usually
- * helps to keep the individual code blocks simple.
- */
-static void
-other_function(const char *name, int depth)
-{
-	printf("%s: entered function, depth = %d\n", name, depth);
-	coro_yield();
-	if (depth < 3)
-		other_function(name, depth + 1);
-}
 
 /**
  * Coroutine body. This code is executed by all the coroutines. Here you
@@ -34,21 +23,7 @@ coroutine_func_f(void *context)
 	/* IMPLEMENT SORTING OF INDIVIDUAL FILES HERE. */
 
 	struct coro *this = coro_this();
-	char *name = context;
-	printf("Started coroutine %s\n", name);
-	printf("%s: switch count %lld\n", name, coro_switch_count(this));
-	printf("%s: yield\n", name);
-	coro_yield();
-
-	printf("%s: switch count %lld\n", name, coro_switch_count(this));
-	printf("%s: yield\n", name);
-	coro_yield();
-
-	printf("%s: switch count %lld\n", name, coro_switch_count(this));
-	other_function(name, 1);
-	printf("%s: switch count after other function %lld\n", name,
-	       coro_switch_count(this));
-	free(name);
+	coro_arg *arg = (coro_arg*) context;
 	/* This will be returned from coro_status(). */
 	return 0;
 }
@@ -56,25 +31,52 @@ coroutine_func_f(void *context)
 int
 main(int argc, char **argv)
 {
-	/* Delete these suppressions when start using the args. */
-	(void)argc;
-	(void)argv;
+    if(argc < 2) {
+        printf("E yebaaaan idi naxuuuuy");
+        exit(EXIT_SUCCESS);
+    }
+
 	/* Initialize our coroutine global cooperative scheduler. */
 	coro_sched_init();
+    int opt,
+        coro_num = 1;
+
+    uint64_t timeout = INT_MAX,
+            main_start = coro_gettime();
+
+    while((opt = getopt(argc, argv, "hn:T:")) != -1) {
+        switch (opt) {
+            case 'h':
+                exit(EXIT_SUCCESS);
+            case 'n':
+                coro_num = atoi(optarg);
+                break;
+            case 'T':
+                timeout = atoi(optarg);
+                break;
+            default:
+                break;
+        }
+    }
+    char **filenames = (char **) malloc(sizeof(char *) * (argc - optind));
+    for(int i = 0; optind < argc; ++optind, ++i) {
+        filenames[i] = argv[optind];
+    }
+
 	/* Start several coroutines. */
-	for (int i = 0; i < 3; ++i) {
+	for (int i = 0; i < coro_num; ++i) {
+        coro_ctx new_ctx;
+        new_ctx.id = i;
+        new_ctx.start_time = 0;
+        new_ctx.total_time = 0;
+        new_ctx.timeout = timeout / coro_num;
+        coro_arg new_arg;
+        new_arg.ctx = &new_ctx;
 		/*
-		 * The coroutines can take any 'void *' interpretation of which
-		 * depends on what you want. Here as an example I give them
-		 * some names.
-		 */
-		char name[16];
-		sprintf(name, "coro_%d", i);
-		/*
-		 * I have to copy the name. Otherwise all the coroutines would
+		 * I have to copy the name. Otherwise, all the coroutines would
 		 * have the same name when they finally start.
 		 */
-		coro_new(coroutine_func_f, strdup(name));
+		coro_new(coroutine_func_f, &new_arg);
 	}
 	/* Wait for all the coroutines to end. */
 	struct coro *c;
@@ -88,8 +90,10 @@ main(int argc, char **argv)
 		coro_delete(c);
 	}
 	/* All coroutines have finished. */
-
+    free(filenames);
+    int i = 5;
+    for(i = 5; i >= 0; i--)
+        printf("%d\n", i);
 	/* IMPLEMENT MERGING OF THE SORTED ARRAYS HERE. */
-
 	return 0;
 }
