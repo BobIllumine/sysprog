@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <limits.h>
 #include <string.h>
+#include <stdio.h>
 
 static void
 test_open(void)
@@ -51,9 +52,11 @@ test_stress_open(void)
 		int *in = &fd[i][0], *out = &fd[i][1];
 		*in = ufs_open(name, UFS_CREATE);
 		*out = ufs_open(name, 0);
+		fprintf(stderr, "[test_stress_open] open %d %d\n", *in, *out);
 		unit_fail_if(*in == -1 || *out == -1);
 		ssize_t rc = ufs_write(*out, name, name_len);
 		unit_fail_if(rc != name_len);
+		fprintf(stderr, "[test_stress_open] open %d %d\n", *in, *out);
 	}
 	unit_msg("read the data back");
 	for (int i = 0; i < count; ++i) {
@@ -447,13 +450,21 @@ main(void)
 	unit_test_start();
 
 	test_open();
+	getchar();
 	test_close();
+	getchar();
 	test_io();
+	getchar();
 	test_delete();
+	getchar();
 	test_stress_open();
+	getchar();
 	test_max_file_size();
+	getchar();
 	test_rights();
+	getchar();
 	test_resize();
+	getchar();
 
 	/* Free the memory to make the memory leak detector happy. */
 	ufs_destroy();
