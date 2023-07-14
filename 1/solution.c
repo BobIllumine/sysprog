@@ -32,7 +32,7 @@ int
 main(int argc, char **argv)
 {
     if(argc < 2) {
-        printf("E yebaaaan idi naxuuuuy");
+        printf("Please provide more args");
         exit(EXIT_SUCCESS);
     }
 
@@ -91,9 +91,6 @@ main(int argc, char **argv)
 	}
 	/* All coroutines have finished. */
     free(filenames);
-    int i = 5;
-    for(i = 5; i >= 0; i--)
-        printf("%d\n", i);
 	/* IMPLEMENT MERGING OF THE SORTED ARRAYS HERE. */
 	return 0;
 }

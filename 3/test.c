@@ -304,8 +304,9 @@ test_max_file_size(void)
 	free(buf);
 	unit_msg("read works");
 	unit_fail_if(ufs_close(fd) == -1);
+	unit_msg("closed");
 	unit_fail_if(ufs_delete("file") == -1);
-
+	unit_msg("deleted");
 	unit_test_finish();
 }
 
@@ -450,21 +451,13 @@ main(void)
 	unit_test_start();
 
 	test_open();
-	getchar();
 	test_close();
-	getchar();
 	test_io();
-	getchar();
 	test_delete();
-	getchar();
 	test_stress_open();
-	getchar();
 	test_max_file_size();
-	getchar();
 	test_rights();
-	getchar();
 	test_resize();
-	getchar();
 
 	/* Free the memory to make the memory leak detector happy. */
 	ufs_destroy();
