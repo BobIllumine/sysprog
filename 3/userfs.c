@@ -360,18 +360,15 @@ ufs_delete(const char *filename)
     for(struct file *f_iter = file_list; f_iter != NULL; f_iter = f_iter->next) {
         if(!f_iter->lazy_delete && !strcmp(f_iter->name, filename))
             f_ptr = f_iter;
-        fprintf(stderr, "[ufs_delete] iter_name - %s, name - %s\n", f_iter->name, filename);
     }
     // No file error
     if(!f_ptr) {
         ufs_error_code = UFS_ERR_NO_FILE;
         return -1;
     }
-    fprintf(stderr, "[ufs_delete: post-loop] file_size - %d, name - %s\n", f_ptr->size, filename);
     // In case file has no active references
     if(!f_ptr->refs) {
         struct block *b_ptr = NULL;
-        fprintf(stderr, "[ufs_delete: delete] file_size - %d, name - %s\n", f_ptr->size, filename);
         int cnt = 0;
         // Clear the memory blocks
         for(struct block *b_iter = f_ptr->block_list; b_iter != NULL; b_iter = b_iter->next) {
@@ -380,7 +377,6 @@ ufs_delete(const char *filename)
             if(b_iter->prev)
                 free(b_iter->prev);
             b_ptr = b_iter;
-            fprintf(stderr, "[ufs_delete: block free loop] file_size - %d, name - %s, cnt - %d\n", f_ptr->size, filename, ++cnt);
         }
         // Free the last block
         free(b_ptr);
@@ -400,11 +396,9 @@ ufs_delete(const char *filename)
             file_list = f_ptr->next ? f_ptr->next : NULL;
         // Free the file
         free(f_ptr);
-        fprintf(stderr, "[ufs_delete: post-delete] file_list - %lu, name - %s\n", file_list, filename);
     }
     // Set the lazy deletion flag otherwise (will be deleted when closed)
     else {
-        fprintf(stderr, "[ufs_delete: mark] iter_name - %s, name - %s\n", f_ptr->size, filename);
         f_ptr->lazy_delete = true;
     }
     return 0;
@@ -421,13 +415,12 @@ ufs_resize(int fd, size_t new_size) {
     }
     struct file *f_ptr = file_descriptors[fd]->file;
     if(!f_ptr) {
-        fprintf(stderr, "[ufs_resize] shit\n");
         ufs_error_code = UFS_ERR_NO_FILE;
         return -1;
     }
     // Count the blocks
     int blocks = f_ptr->size / BLOCK_SIZE + (f_ptr->size % BLOCK_SIZE ? 1 : 0);
-    fprintf(stderr, "[ufs_resize] blocks - %d\n", blocks);
+    // If shrink is needed
     if(new_size < f_ptr->size) {
         while((--blocks) * BLOCK_SIZE > new_size)
             if(f_ptr->last_block->prev) {
@@ -438,6 +431,7 @@ ufs_resize(int fd, size_t new_size) {
                 f_ptr->last_block = b_ptr;
             }
     }
+    // Otherwise
     else {
         while((blocks++) * BLOCK_SIZE < new_size) {
             struct block *b_ptr = (struct block *) malloc(sizeof(struct block));
@@ -469,18 +463,14 @@ void
 ufs_destroy(void)
 {
     struct file *f_ptr = NULL;
-    fprintf(stderr, "[ufs_destroy] ustroy destroy\n");
     for(int fd_iter = 0; fd_iter < file_descriptor_capacity; ++fd_iter) {
         if(file_descriptors[fd_iter]) {
             free(file_descriptors[fd_iter]->file);
             free(file_descriptors[fd_iter]);
-            fprintf(stderr, "[ufs_destroy] fd_id - %d\n", fd_iter);
         }
     }
     free(file_descriptors);
-    fprintf(stderr, "[ufs_destroy] fd_list freed\n");
     for(f_ptr = file_list; f_ptr != NULL; f_ptr = f_ptr->next) {
-        fprintf(stderr, "[ufs_destroy] file_name - %s\n", f_ptr->name);
         struct block *b_ptr = NULL;
         int cnt = 0;
         // Clear the memory blocks
