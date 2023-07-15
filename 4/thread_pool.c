@@ -189,16 +189,13 @@ thread_pool_delete(struct thread_pool *pool)
 	for(int i = 0; i < pool->a_thread_cnt; ++i)
 		pthread_join(pool->threads[i], NULL);
 	// Free task queue and thread handle list
-	fprintf(stderr, "[thread_pool_delete] hello 1\n");
 	free(pool->task_q);
-	fprintf(stderr, "[thread_pool_delete] hello 2\n");
 	free(pool->threads);
-	fprintf(stderr, "[thread_pool_delete] hello 3\n");
 	// Destroy mutex and conditionals
-	pthread_cond_destroy(pool->tp_cond);
-	free(pool->tp_cond);
 	pthread_mutex_destroy(pool->tp_mutex);
 	free(pool->tp_mutex);
+	pthread_cond_destroy(pool->tp_cond);
+	free(pool->tp_cond);
 	pthread_condattr_destroy(pool->attr);
 	free(pool->attr);
 	// Free pool
@@ -308,11 +305,50 @@ thread_task_join(struct thread_task *task, void **result)
 int
 thread_task_timed_join(struct thread_task *task, double timeout, void **result)
 {
-	/* IMPLEMENT THIS FUNCTION */
-	(void)task;
-	(void)timeout;
-	(void)result;
-	return TPOOL_ERR_NOT_IMPLEMENTED;
+	if(!task)
+		return TPOOL_ERR_INVALID_ARGUMENT;
+	if(timeout <= 0)
+		return TPOOL_ERR_TIMEOUT;
+	pthread_mutex_lock(task->t_mutex);
+	// Task not pushed
+	if(task->state == T_WAIT_PUSH) {
+		pthread_mutex_unlock(task->t_mutex);
+		return TPOOL_ERR_TASK_NOT_PUSHED;
+	}
+	// Task detached
+	if(task->state == T_DETACHED) {
+		pthread_mutex_unlock(task->t_mutex);
+		return TPOOL_ERR_TASK_DETACHED;
+	}
+	struct timespec task_to;
+	clock_gettime(CLOCK_MONOTONIC, &task_to);
+	task_to.tv_sec += (time_t)timeout;
+	// Counting nanoseconds
+	// Cast timeout to long to floor the real part, then cast to long again
+	task_to.tv_nsec += (time_t)(1e9 * (timeout - (time_t)timeout));
+	// Carry over a second
+	if(task_to.tv_nsec >= (time_t)1e9) {
+		task_to.tv_nsec -= (time_t)1e9;
+		task_to.tv_sec += 1;
+	}
+	while(task->state != T_FINISHED) {
+		struct timespec t_now;
+		clock_gettime(CLOCK_MONOTONIC, &t_now);
+		// Timeout on unfinished task
+		if(((t_now.tv_sec == task_to.tv_sec && t_now.tv_nsec >= task_to.tv_nsec)
+			|| t_now.tv_sec > task_to.tv_sec) 
+			&& task->state != T_FINISHED) {
+			pthread_mutex_unlock(task->t_mutex);
+			return TPOOL_ERR_TIMEOUT;
+		}
+		// Wait for signal
+		pthread_cond_timedwait(task->t_cond, task->t_mutex, &task_to);
+	}
+	// Get the result
+	*result = task->result;
+	task->state = T_JOINED;
+	pthread_mutex_unlock(task->t_mutex);
+	return 0;
 }
 
 #endif

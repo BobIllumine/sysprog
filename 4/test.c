@@ -169,14 +169,12 @@ map_reduce_inc(struct thread_pool *p, struct thread_task **tasks, int count,
 		struct thread_task **t = &tasks[i];
 		unit_fail_if(thread_task_new(t, task_incr_f, arg) != 0);
 		unit_fail_if(thread_pool_push_task(p, *t) != 0);
-		fprintf(stderr, "[map_reduce_inc] hello %d\n", i);
 	}
 	for (int i = 0; i < count; ++i) {
 		struct thread_task *t = tasks[i];
 		unit_fail_if(thread_task_join(t, &result) != 0);
 		unit_fail_if(thread_task_delete(t) != 0);
 		unit_fail_if(result != arg);
-		fprintf(stderr, "[map_reduce_inc] bye %d, count %d\n", i, count);
 	}
 }
 
@@ -360,7 +358,7 @@ main(void)
 	test_push();
 	test_thread_pool_delete();
 	test_thread_pool_max_tasks();
-	// test_timed_join();
+	test_timed_join();
 	test_detach_stress();
 	test_detach_long();
 
