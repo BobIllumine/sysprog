@@ -19,7 +19,6 @@ struct thread_task {
 	void *arg;
 
 	/* PUT HERE OTHER MEMBERS */
-	pthread_t *t_worker; // task worker thread
 	pthread_mutex_t *t_mutex; // task mutex
 	pthread_cond_t *t_cond; // task conditional
 	
@@ -71,8 +70,6 @@ void *worker_thread(void *arg) {
 		++t_pool->b_thread_cnt;
 		// Lock task mutex
 		pthread_mutex_lock(task->t_mutex);
-		// Pass the handle
-		task->t_worker = t_pool->threads[args->t_id];
 		// Unlock pool mutex
 		pthread_mutex_unlock(t_pool->tp_mutex);
 		// Set state as running
