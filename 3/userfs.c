@@ -193,7 +193,7 @@ ufs_write(int fd, const char *buf, size_t size)
     int b_id = 0;
     struct block *b_ptr = f_ptr->block_list;
     // Find the last block
-    while(BLOCK_SIZE * (++b_id) < fd_ptr->offset) {
+    while((size_t)(BLOCK_SIZE * (++b_id)) < fd_ptr->offset) {
         b_ptr = b_ptr->next;
         // Create missing blocks (if needed)
         if(!b_ptr) {
@@ -240,7 +240,7 @@ ufs_write(int fd, const char *buf, size_t size)
         memcpy(b_ptr->memory + b_offset, buf + w_bytes, w_size);
         // Update the offsets and sizes
         b_offset += w_size, fd_ptr->offset += w_size, w_bytes += w_size;
-        b_ptr->occupied = b_offset < b_ptr->occupied ? b_ptr->occupied : b_offset;
+        b_ptr->occupied = (int)b_offset < b_ptr->occupied ? b_ptr->occupied : (int)b_offset;
         f_ptr->size = fd_ptr->offset > f_ptr->size ? fd_ptr->offset : f_ptr->size;
     }
 	return w_bytes;
@@ -266,7 +266,7 @@ ufs_read(int fd, char *buf, size_t size)
     if(fd_ptr->offset == f_ptr->size)
         fd_ptr->offset = 0;
     struct block *b_ptr;
-    int b_id;
+    size_t b_id;
     // Look up for the needed block
     for(b_ptr = f_ptr->block_list, b_id = 0; b_id < fd_ptr->offset / BLOCK_SIZE; b_ptr = b_ptr->next, ++b_id)
         if(!b_ptr)
@@ -277,7 +277,7 @@ ufs_read(int fd, char *buf, size_t size)
     // Read the given bytes
     while(r_bytes < size) {
         // All the data is read
-        if(!b_ptr || b_ptr->occupied == b_offset)
+        if(!b_ptr || (size_t)b_ptr->occupied == b_offset)
             return r_bytes;
         // Get the correct byte count to read in current block
         size_t r_size = BLOCK_SIZE - b_offset > size - r_bytes ?
@@ -369,7 +369,6 @@ ufs_delete(const char *filename)
     // In case file has no active references
     if(!f_ptr->refs) {
         struct block *b_ptr = NULL;
-        int cnt = 0;
         // Clear the memory blocks
         for(struct block *b_iter = f_ptr->block_list; b_iter != NULL; b_iter = b_iter->next) {
             // Free previous block
@@ -422,7 +421,7 @@ ufs_resize(int fd, size_t new_size) {
     int blocks = f_ptr->size / BLOCK_SIZE + (f_ptr->size % BLOCK_SIZE ? 1 : 0);
     // If shrink is needed
     if(new_size < f_ptr->size) {
-        while((--blocks) * BLOCK_SIZE > new_size)
+        while((size_t)((--blocks) * BLOCK_SIZE) > new_size)
             if(f_ptr->last_block->prev) {
                 struct block *b_ptr = f_ptr->last_block->prev;
                 free(b_ptr->next->memory);
@@ -433,7 +432,7 @@ ufs_resize(int fd, size_t new_size) {
     }
     // Otherwise
     else {
-        while((blocks++) * BLOCK_SIZE < new_size) {
+        while((size_t)((blocks++) * BLOCK_SIZE) < new_size) {
             struct block *b_ptr = (struct block *) malloc(sizeof(struct block));
             *b_ptr = (struct block) {
                 .memory = (char *)malloc(BLOCK_SIZE * sizeof(char)),
@@ -472,7 +471,6 @@ ufs_destroy(void)
     free(file_descriptors);
     for(f_ptr = file_list; f_ptr != NULL; f_ptr = f_ptr->next) {
         struct block *b_ptr = NULL;
-        int cnt = 0;
         // Clear the memory blocks
         for(struct block *b_iter = f_ptr->block_list; b_iter != NULL; b_iter = b_iter->next) {
             // Free previous block

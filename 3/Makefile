@@ -1,4 +1,4 @@
-GCC_FLAGS = -Wextra -Wall -ldl -rdynamic -Wno-gnu-folding-constant
+GCC_FLAGS = -Wextra -Werror -Wall -ldl -rdynamic -Wno-gnu-folding-constant
 UTILS = ../utils
 
 all:  build
