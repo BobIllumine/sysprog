@@ -1,8 +1,9 @@
 //
 // Created by riseinokoe on 03.07.23.
 //
-
+#define _POSIX_C_SOURCE 200809
 #include "coro_util.h"
+#include "libcoro.h"
 
 
 uint64_t coro_gettime() {
@@ -50,5 +51,23 @@ void merge(long arr[], int l, int m, int r) {
 }
 
 void merge_sort(coro_ctx *ctx, long arr[], int l, int r) {
-
+    if(r <= l)
+        return;
+    uint64_t w_time = coro_gettime() - ctx->start_time;
+    if(w_time > ctx->timeout) {
+        ctx->total_time += w_time;
+        ++ctx->s_cnt;
+        coro_yield();
+        ctx->start_time = coro_gettime();
+    }
+    int m = l + (r - l) / 2;
+    merge_sort(ctx, arr, l, m);
+    ctx->start_time = coro_gettime();
+    merge_sort(ctx, arr, m + 1, r);
+    ctx->start_time = coro_gettime();
+    merge(arr, l, m, r);
+    w_time = coro_gettime() - ctx->start_time;
+    ctx->total_time += w_time;
+    ++ctx->s_cnt;
+    coro_yield();
 }

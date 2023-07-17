@@ -14,17 +14,21 @@ typedef struct {
     uint64_t start_time;
     uint64_t total_time;
     uint64_t timeout;
+    int s_cnt;
 } coro_ctx;
 
 uint64_t coro_gettime();
 
 typedef struct {
     coro_ctx *ctx;
-    char *filename;
+    char **queue;
+    int *q_size;
+    long **arrays;
+    long *arr_sizes;
 } coro_arg;
 
-static void merge(long arr[], int l, int m, int r);
+void merge(long arr[], int l, int m, int r);
 
-static void merge_sort(coro_ctx *ctx, long arr[], int l, int r);
+void merge_sort(coro_ctx *ctx, long arr[], int l, int r);
 
 #endif //SYSPROG_CORO_UTIL_H

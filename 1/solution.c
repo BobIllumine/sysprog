@@ -4,6 +4,7 @@
 #include "coro_util.h"
 #include <limits.h>
 #include "heap_help.h"
+#include <stdlib.h>
 
 /**
  * You can compile and run this code using the commands:
@@ -21,10 +22,49 @@ static int
 coroutine_func_f(void *context)
 {
 	/* IMPLEMENT SORTING OF INDIVIDUAL FILES HERE. */
-
-	struct coro *this = coro_this();
+	// struct coro *this = coro_this(); 
 	coro_arg *arg = (coro_arg*) context;
+    char *cur_filename = NULL;
+    if(*arg->q_size > 0)
+        cur_filename = arg->queue[--(*arg->q_size)];
+    arg->ctx->start_time = coro_gettime();
+    while(cur_filename) {
+        FILE *file = fopen(cur_filename, "r");
+        if(!file) {
+            free(cur_filename);
+            return -1;
+        } 
+        printf("%s.\n", cur_filename);
+        long arr_cnt = 0, raw_size = 10;
+        long *raw_arr = (long *) malloc(sizeof(long) * 10);
+        while(!feof(file)) {
+            if(arr_cnt == raw_size - 1)
+                raw_size *= 2, raw_arr = realloc(raw_arr, sizeof(long) * raw_size);
+            fscanf(file, "%ld", &raw_arr[arr_cnt++]);
+        }
+        fclose(file);
+        arg->arrays[(*arg->q_size)] = (long*) malloc(sizeof(long) * arr_cnt);
+        arg->arr_sizes[(*arg->q_size)] = arr_cnt;
+        for(int i = 0; i < arr_cnt; ++i)
+            arg->arrays[(*arg->q_size)][i] = raw_arr[i];
+        free(raw_arr);
+        uint64_t w_time = coro_gettime() - arg->ctx->start_time;
+        if(w_time > arg->ctx->timeout) {
+            arg->ctx->total_time += w_time;
+            ++arg->ctx->s_cnt;
+            coro_yield();
+            arg->ctx->start_time = coro_gettime();
+        }
+        merge_sort(arg->ctx, arg->arrays[(*arg->q_size)], 0, arr_cnt - 1);
+        if(!*arg->q_size)
+            break;
+        free(cur_filename);
+        cur_filename = arg->queue[--(*arg->q_size)];
+    }
+    printf("Coroutine %lu: total working time - %lu ms, switch count - %d\n", arg->ctx->id, arg->ctx->total_time / 1000, arg->ctx->s_cnt);
 	/* This will be returned from coro_status(). */
+    free(arg->ctx);
+    free(arg);
 	return 0;
 }
 
@@ -32,7 +72,7 @@ int
 main(int argc, char **argv)
 {
     if(argc < 2) {
-        printf("Please provide more args");
+        printf("Please provide more args.\n");
         exit(EXIT_SUCCESS);
     }
 
@@ -47,36 +87,47 @@ main(int argc, char **argv)
     while((opt = getopt(argc, argv, "hn:T:")) != -1) {
         switch (opt) {
             case 'h':
+                printf("Use: <PROGRAM_PATH> [-h] [-n] <CORO_NUM> [-T] <TARGET_LATENCY> <FILE1> <FILE2> ...\n");
+                printf("Options: \n");
+                printf("[-h]: Help message\n");
+                printf("[-n]: Numbers of coroutines\n");
+                printf("[-T]: Target latency for coroutines (in ms)\n");
                 exit(EXIT_SUCCESS);
             case 'n':
                 coro_num = atoi(optarg);
                 break;
             case 'T':
-                timeout = atoi(optarg);
+                timeout = atoi(optarg) * 1000;
                 break;
             default:
                 break;
         }
     }
-    char **filenames = (char **) malloc(sizeof(char *) * (argc - optind));
-    for(int i = 0; optind < argc; ++optind, ++i) {
+    int filenames_size = argc - optind;
+    char **filenames = calloc(filenames_size, sizeof(char *));
+    for(int i = 0; optind < argc; ++optind, ++i)
         filenames[i] = argv[optind];
-    }
-
+    long **all_arrays = (long **) malloc(sizeof(long *) * filenames_size);
+    long *all_sizes = calloc(filenames_size, sizeof(long));
 	/* Start several coroutines. */
 	for (int i = 0; i < coro_num; ++i) {
-        coro_ctx new_ctx;
-        new_ctx.id = i;
-        new_ctx.start_time = 0;
-        new_ctx.total_time = 0;
-        new_ctx.timeout = timeout / coro_num;
-        coro_arg new_arg;
-        new_arg.ctx = &new_ctx;
-		/*
-		 * I have to copy the name. Otherwise, all the coroutines would
-		 * have the same name when they finally start.
-		 */
-		coro_new(coroutine_func_f, &new_arg);
+        coro_ctx *new_ctx = (coro_ctx *) malloc(sizeof(coro_ctx));
+        *new_ctx = (coro_ctx) {
+            .id = i,
+            .start_time = 0,
+            .total_time = 0,
+            .timeout = timeout / coro_num,
+            .s_cnt = 0
+        };
+        coro_arg *new_arg = (coro_arg *) malloc(sizeof(coro_arg));
+        *new_arg = (coro_arg) {
+            .ctx = new_ctx,
+            .q_size = &filenames_size,
+            .queue = filenames,
+            .arrays = all_arrays,
+            .arr_sizes = all_sizes
+        };
+		coro_new(coroutine_func_f, new_arg);
 	}
 	/* Wait for all the coroutines to end. */
 	struct coro *c;
@@ -90,7 +141,38 @@ main(int argc, char **argv)
 		coro_delete(c);
 	}
 	/* All coroutines have finished. */
-    free(filenames);
+    for(int i = 0; i < filenames_size; ++i)
+        free(filenames[i]);
+    free(filenames);    
 	/* IMPLEMENT MERGING OF THE SORTED ARRAYS HERE. */
+    FILE *output = fopen("result.txt", "w");
+    long pivot = all_sizes[0];
+    long *sorted_arr = (long *) malloc(sizeof(long) * pivot);
+    memcpy(sorted_arr, all_arrays[0], pivot * sizeof(long));
+    for(int i = 1; i < filenames_size; ++i) {
+        // Reallocate some more memory
+        sorted_arr = realloc(sorted_arr, (all_sizes[i] + pivot) * sizeof(long));
+        if(!sorted_arr) {
+            printf("Not enough memory\n");
+            return -1;
+        }
+        // Concatenate arrays
+        for(int j = 0; j < all_sizes[i]; ++j)
+            sorted_arr[pivot + j] = all_arrays[i][j];
+        // Merge them
+        merge(sorted_arr, 0, pivot - 1, pivot + all_sizes[i] - 1);
+        // Update total length
+        pivot += all_sizes[i];
+    }
+    // Output
+    for(int i = 0; i < pivot; ++i)
+        fprintf(output, "%ld ", sorted_arr[i]);
+    for(int i = 0; i < filenames_size; ++i)
+        free(all_arrays[i]);
+    free(sorted_arr);
+    free(all_arrays);
+    free(all_sizes);
+    fclose(output);
+    printf("Program working time - %lu ms.\n", (coro_gettime() - main_start) / 1000);
 	return 0;
 }
