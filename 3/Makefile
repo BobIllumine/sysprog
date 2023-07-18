@@ -1,7 +1,7 @@
 GCC_FLAGS = -Wextra -Werror -Wall -ldl -rdynamic -Wno-gnu-folding-constant
 UTILS = ../utils
 
-all:  build
+all: build
 
 build: test.o userfs.o $(UTILS)/heap_help/heap_help.c
 	gcc $(GCC_FLAGS) test.o userfs.o $(UTILS)/heap_help/heap_help.c

@@ -276,6 +276,11 @@ ufs_read(int fd, char *buf, size_t size)
     size_t r_bytes = 0;
     // Read the given bytes
     while(r_bytes < size) {
+        // Skip to the next block if the current one is fully read
+        if(b_offset == BLOCK_SIZE) {
+            b_ptr = b_ptr->next;
+            b_offset = 0;
+        }
         // All the data is read
         if(!b_ptr || (size_t)b_ptr->occupied == b_offset)
             return r_bytes;
@@ -288,11 +293,6 @@ ufs_read(int fd, char *buf, size_t size)
         memcpy(buf + r_bytes, b_ptr->memory + b_offset, r_size);
         // Update the offsets
         fd_ptr->offset += r_size, r_bytes += r_size, b_offset += r_size;
-        // Skip to the next block if the current one is fully read
-        if(b_offset == BLOCK_SIZE) {
-            b_ptr = b_ptr->next;
-            b_offset = 0;
-        }
     }
     return r_bytes;
 }

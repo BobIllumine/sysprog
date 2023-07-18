@@ -3,7 +3,6 @@
 #include <assert.h>
 #include <limits.h>
 #include <string.h>
-#include <stdio.h>
 
 static void
 test_open(void)
@@ -302,9 +301,8 @@ test_max_file_size(void)
 	free(buf);
 	unit_msg("read works");
 	unit_fail_if(ufs_close(fd) == -1);
-	unit_msg("closed");
 	unit_fail_if(ufs_delete("file") == -1);
-	unit_msg("deleted");
+
 	unit_test_finish();
 }
 
