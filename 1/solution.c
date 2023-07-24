@@ -62,7 +62,7 @@ coroutine_func_f(void *context)
             break;
         cur_filename = arg->queue[--(*arg->q_size)];
     }
-    printf("Coroutine %lu: total working time - %lu ms, switch count - %d\n", arg->ctx->id, arg->ctx->total_time / 1000, arg->ctx->s_cnt);
+    printf("Coroutine %lu: total working time - %lu mcs, switch count - %d\n", (unsigned long)arg->ctx->id, (unsigned long)arg->ctx->total_time, arg->ctx->s_cnt);
     free(arg->ctx);
     free(arg);
 	/* This will be returned from coro_status(). */
@@ -92,13 +92,13 @@ main(int argc, char **argv)
                 printf("Options: \n");
                 printf("[-h]: Help message\n");
                 printf("[-n]: Numbers of coroutines\n");
-                printf("[-T]: Target latency for coroutines (in ms)\n");
+                printf("[-T]: Target latency for coroutines (in mсs)\n");
                 exit(EXIT_SUCCESS);
             case 'n':
                 coro_num = atoi(optarg);
                 break;
             case 'T':
-                timeout = atoi(optarg) * 1000;
+                timeout = atoi(optarg);
                 break;
             default:
                 break;
@@ -131,7 +131,7 @@ main(int argc, char **argv)
         };
 		coro_new(coroutine_func_f, new_arg);
 	}
-    printf("Coroutine creation time - %lu ms.\n", (coro_gettime() - main_start) / 1000);
+    printf("Coroutine creation time - %lu mcs.\n", (coro_gettime() - main_start));
 	/* Wait for all the coroutines to end. */
 	struct coro *c;
 	while ((c = coro_sched_wait()) != NULL) {
@@ -176,6 +176,6 @@ main(int argc, char **argv)
     free(all_arrays);
     free(all_sizes);
     fclose(output);
-    printf("Program working time - %lu ms, merging time - %lu ms.\n", (coro_gettime() - main_start) / 1000, (coro_gettime() - merge_s_time) / 1000);
+    printf("Program working time - %lu mcs, merging time - %lu mcs.\n", (unsigned long)(coro_gettime() - main_start), (unsigned long)(coro_gettime() - merge_s_time));
 	return 0;
 }

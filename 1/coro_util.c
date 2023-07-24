@@ -9,7 +9,7 @@
 uint64_t coro_gettime() {
     struct timespec time;
     clock_gettime(CLOCK_MONOTONIC, &time);
-    return (uint64_t)(time.tv_sec * 1000000) + (uint64_t)(time.tv_nsec / 1000);
+    return (uint64_t)(time.tv_sec * 1e6) + (uint64_t)(time.tv_nsec / 1000);
 }
 
 void merge(long arr[], int l, int m, int r) {
