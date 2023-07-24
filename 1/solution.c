@@ -131,7 +131,7 @@ main(int argc, char **argv)
         };
 		coro_new(coroutine_func_f, new_arg);
 	}
-    printf("Coroutine creation time - %lu mcs.\n", (coro_gettime() - main_start));
+    printf("Coroutine creation time - %lu mcs.\n", (unsigned long)(coro_gettime() - main_start));
 	/* Wait for all the coroutines to end. */
 	struct coro *c;
 	while ((c = coro_sched_wait()) != NULL) {
