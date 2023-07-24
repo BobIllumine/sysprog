@@ -29,7 +29,7 @@ typedef struct {
 
 void merge(long arr[], int l, int m, int r);
 
-void iter_merge_sort(long arr[], long size);
+void iter_merge_sort(coro_ctx *ctx, long arr[], long size);
 
 // Merge sort is a pain to use with latencies
 void quick_sort(coro_ctx *ctx, long arr[], int l, int r);

@@ -48,7 +48,7 @@ coroutine_func_f(void *context)
             arg->arrays[(*arg->q_size)][i] = raw_arr[i];
         free(raw_arr);
         // Quick sort is much more quicker, but it is too painful to measure recursive function's working time
-        iter_merge_sort(arg->arrays[(*arg->q_size)], arr_cnt);
+        iter_merge_sort(arg->ctx, arg->arrays[(*arg->q_size)], arr_cnt);
         // quick_sort(arg->ctx, arg->arrays[(*arg->q_size)], 0, arr_cnt - 1);
         uint64_t w_time = coro_gettime() - arg->ctx->start_time;
         // printf("%s, #%d, %lu ms, %lu ms.\n", cur_filename, arg->ctx->id, arg->ctx->timeout, w_time);

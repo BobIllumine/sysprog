@@ -50,10 +50,16 @@ void merge(long arr[], int l, int m, int r) {
     free(arr_r);
 }
 
-void iter_merge_sort(long arr[], long size) {
+void iter_merge_sort(coro_ctx *ctx, long arr[], long size) {
     // ctx->start_time = coro_gettime();
     for(int c_size = 1; c_size < size; c_size *= 2) {
         for(int l = 0; l < size - 1; l += 2 * c_size) {
+            if(coro_gettime() - ctx->start_time > ctx->timeout) {
+                ctx->total_time += coro_gettime() - ctx->start_time;
+                ++ctx->s_cnt;
+                coro_yield();
+                ctx->start_time = coro_gettime();
+            }
             int m = min(l + c_size - 1, size - 1),
                 r = min(l + 2 * c_size - 1, size - 1);
             int size_l = m - l + 1,
