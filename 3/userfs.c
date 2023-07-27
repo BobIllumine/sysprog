@@ -263,8 +263,8 @@ ufs_read(int fd, char *buf, size_t size)
     struct file *f_ptr = fd_ptr->file;
     // Fix the offset (if needed)
     fd_ptr->offset = f_ptr->size < fd_ptr->offset ? f_ptr->size : fd_ptr->offset;
-    if(fd_ptr->offset == f_ptr->size)
-        fd_ptr->offset = 0;
+    // if(fd_ptr->offset == f_ptr->size)
+    //     fd_ptr->offset = 0;
     struct block *b_ptr;
     size_t b_id;
     // Look up for the needed block
