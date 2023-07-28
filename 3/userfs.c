@@ -65,7 +65,6 @@ struct filedesc {
  * taken by next ufs_open() call.
  */
 static struct filedesc **file_descriptors = NULL;
-static int file_descriptor_count = 0;
 static int file_descriptor_capacity = 0;
 
 enum ufs_error_code
@@ -79,9 +78,10 @@ ufs_open(const char *filename, int flags)
 {
     struct file *f_ptr = NULL;
     // Look for a file in the file list
-    for(struct file *f_iter = file_list; f_iter != NULL; f_iter = f_iter->next)
+    for(struct file *f_iter = file_list; f_iter != NULL; f_iter = f_iter->next) {
         if(!strcmp(f_iter->name, filename) && !f_iter->lazy_delete)
             f_ptr = f_iter;            
+    }
     
     // No file is found
     if(!f_ptr) {
@@ -116,7 +116,6 @@ ufs_open(const char *filename, int flags)
             // Set links
             f_iter->next = f_ptr;
             f_ptr->prev = f_iter;
-            f_ptr->next = NULL;
         }
         else {
             file_list = f_ptr;
@@ -144,7 +143,7 @@ ufs_open(const char *filename, int flags)
         file_descriptors[0] = NULL;
     }
     // Look up for a free file descriptor
-    for(int fd_iter = file_descriptor_count; fd_iter < file_descriptor_capacity; ++fd_iter)
+    for(int fd_iter = file_descriptor_capacity - 1; fd_iter >= 0; --fd_iter)
         if(!file_descriptors[fd_iter]) {
             fd = fd_iter;
             break;
@@ -152,12 +151,11 @@ ufs_open(const char *filename, int flags)
     // No available descriptors
     if(fd == -1) {
         // Double the size of the file descriptor list to do fewer reallocations in case of large amount of files
-        file_descriptors = realloc(file_descriptors, (file_descriptor_capacity *= 2) * sizeof(struct filedesc*) );
-        fd = file_descriptor_count;
+        file_descriptors = realloc(file_descriptors, (++file_descriptor_capacity) * sizeof(struct filedesc*) );
+        fd = file_descriptor_capacity - 1;
     }
     file_descriptors[fd] = fd_ptr;
     // Increment the descriptor count
-    ++file_descriptor_count;
     return fd;
 }
 
@@ -175,10 +173,11 @@ ufs_write(int fd, const char *buf, size_t size)
         ufs_error_code = UFS_ERR_NO_PERMISSION;
         return -1;
     }
-
     struct file *f_ptr = fd_ptr->file;
+    // Fix the offset (if needed)
+    fd_ptr->offset = f_ptr->size < fd_ptr->offset ? f_ptr->size : fd_ptr->offset;
     // Initalize the block list (if needed)
-    if(!f_ptr->block_list) {
+    if(!f_ptr->last_block) {
         f_ptr->last_block = (struct block*) malloc(sizeof(struct block));
         f_ptr->block_list = f_ptr->last_block;
         *f_ptr->last_block = (struct block) {
@@ -188,8 +187,6 @@ ufs_write(int fd, const char *buf, size_t size)
             .occupied = 0,
         };
     }
-    // Fix the offset (if needed)
-    fd_ptr->offset = f_ptr->size < fd_ptr->offset ? f_ptr->size : fd_ptr->offset;
     int b_id = 0;
     struct block *b_ptr = f_ptr->block_list;
     // Find the last block
@@ -206,7 +203,6 @@ ufs_write(int fd, const char *buf, size_t size)
             };
             f_ptr->last_block->next = b_ptr;
             f_ptr->last_block = b_ptr;
-            f_ptr->last_block->next = NULL;
         }
     }
     // Offset in this block
@@ -223,10 +219,9 @@ ufs_write(int fd, const char *buf, size_t size)
                     .next = NULL,
                     .occupied = 0,
             };
+            f_ptr->last_block->next = b_new;
+            f_ptr->last_block = b_new;
             b_ptr = b_new;
-            f_ptr->last_block->next = b_ptr;
-            f_ptr->last_block = b_ptr;
-            f_ptr->last_block->next = NULL;
             b_offset = 0;
         }
         // In case the data to write is larger than available space in block
@@ -326,28 +321,22 @@ ufs_close(int fd)
         // Free the filename
         free((void *)f_ptr->name);
         // Link previous and next files in the list (if possible)
-        if(f_ptr->next && f_ptr->prev) {
+        if(f_ptr->next)
             f_ptr->next->prev = f_ptr->prev;
+        if(f_ptr->prev)
             f_ptr->prev->next = f_ptr->next;
-        }
-        else if(f_ptr->next)
-            f_ptr->next->prev = NULL;
-        else if(f_ptr->prev)
-            f_ptr->prev->next = NULL;
         // Set the next pointer as the beginning of the list (if needed)
         if(file_list == f_ptr)
-            file_list = f_ptr->next ? f_ptr->next : NULL;
+            file_list = f_ptr->next;
         // Free the file
         free(f_ptr);
     }
     // Free the file descriptor
     free(file_descriptors[fd]);
     file_descriptors[fd] = NULL;
-    // Shrink the file descriptor list (if needed)
-    --file_descriptor_count;
-    while(file_descriptors && file_descriptor_capacity > file_descriptor_count && !file_descriptors[file_descriptor_capacity - 1])
+    // Shrink the list
+    while(file_descriptors && file_descriptor_capacity > 0 && !file_descriptors[file_descriptor_capacity - 1])
         free(file_descriptors[--file_descriptor_capacity]);
-    // Reallocate
     file_descriptors = realloc(file_descriptors, file_descriptor_capacity * sizeof(struct filedesc*));
     return 0;
 }
@@ -382,17 +371,13 @@ ufs_delete(const char *filename)
         // Free the filename
         free((void *)f_ptr->name);
         // Link previous and next files in the list (if possible)
-        if(f_ptr->prev && f_ptr->next) {
+        if(f_ptr->next)
             f_ptr->next->prev = f_ptr->prev;
+        if(f_ptr->prev)
             f_ptr->prev->next = f_ptr->next;
-        }
-        else if(f_ptr->next)
-            f_ptr->next->prev = NULL;
-        else if(f_ptr->prev)
-            f_ptr->prev->next = NULL;
         // Set the next pointer as the beginning of the list (if needed)
         if(file_list == f_ptr)
-            file_list = f_ptr->next ? f_ptr->next : NULL;
+            file_list = f_ptr->next;
         // Free the file
         free(f_ptr);
     }
@@ -404,7 +389,7 @@ ufs_delete(const char *filename)
 }
 int
 ufs_resize(int fd, size_t new_size) {
-    if(fd < 0 || fd >= file_descriptor_count || !file_descriptors[fd]) {
+    if(fd < 0 || fd >= file_descriptor_capacity || !file_descriptors[fd]) {
         ufs_error_code = UFS_ERR_NO_FILE;
         return -1;
     }
@@ -464,7 +449,6 @@ ufs_destroy(void)
     struct file *f_ptr = NULL;
     for(int fd_iter = 0; fd_iter < file_descriptor_capacity; ++fd_iter) {
         if(file_descriptors[fd_iter]) {
-            free(file_descriptors[fd_iter]->file);
             free(file_descriptors[fd_iter]);
         }
     }
@@ -487,8 +471,8 @@ ufs_destroy(void)
         // Free the filename
         free((void *)f_ptr->name);
         // Free the file
-        free(f_ptr);
     }
+    free(f_ptr);
     free(file_list);
     return;
 }

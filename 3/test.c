@@ -446,11 +446,11 @@ main(void)
 {
 	unit_test_start();
 
+	test_delete();
+	test_stress_open();
 	test_open();
 	test_close();
 	test_io();
-	test_delete();
-	test_stress_open();
 	test_max_file_size();
 	test_rights();
 	test_resize();
